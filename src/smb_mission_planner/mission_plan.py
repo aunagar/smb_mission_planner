@@ -63,7 +63,7 @@ class ChallengeMission(smach.State):
         self.waypoint_idx = 0
         self.topic_names = topic_names
         self.exploration = exploration
-
+        self.listener = TransformListener()
         self.waypoint_pose_publisher = rospy.Publisher(topic_names['waypoint'], PoseStamped, queue_size=1)
         self.base_pose_subscriber = rospy.Subscriber(topic_names['base_pose'], Odometry, self.basePoseCallback)
         while self.waypoint_pose_publisher.get_num_connections() == 0 and not rospy.is_shutdown():
@@ -191,16 +191,17 @@ class ChallengeMission(smach.State):
         posestamp.header.frame_id="odom"
         posestamp.header.stamp=rospy.get_rostime()
         posestamp.pose =Odometry_msg.pose.pose
-        self.base_pose_subscriber.transformPose("/map", posestamp)
+
+        finalposestamp=self.listener.transformPose("/map", posestamp)
         
         #t, r = self.listener.lookupTransform(self.world_frame,self.detection_frame,
          #                                   rospy.Time(0))        
-        x_m=posestamp.pose.position.x
-        y_m=posestamp.pose.position.y
+        x_m=finalposestamp.pose.position.x
+        y_m=finalposestamp.pose.position.y
         #x_m = Odometry_msg.pose.pose.position.x
         #y_m = Odometry_msg.pose.pose.position.y
         #quaternion = Odometry_msg.pose.pose.orientation
-        quaternion = posestamp.pose.orientation
+        quaternion = finalposestamp.pose.orientation
         explicit_quat = [quaternion.x, quaternion.y, quaternion.z, quaternion.w]
         roll_rad, pitch_rad, yaw_rad = tf.transformations.euler_from_quaternion(explicit_quat)
 
