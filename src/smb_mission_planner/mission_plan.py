@@ -197,8 +197,10 @@ class ChallengeMission(smach.State):
         posestamp.header.frame_id="tracking_camera_odom"
         # posestamp.header.stamp=rospy.get_rostime()
         posestamp.pose =Odometry_msg.pose.pose
-
-        finalposestamp=self.listener.transformPose("/map", posestamp)
+        try:
+            finalposestamp=self.listener.transformPose("/map", posestamp)
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            pass
         
         #t, r = self.listener.lookupTransform(self.world_frame,self.detection_frame,
          #                                   rospy.Time(0))        
