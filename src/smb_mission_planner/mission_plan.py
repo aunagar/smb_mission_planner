@@ -191,8 +191,11 @@ class ChallengeMission(smach.State):
     def basePoseCallback(self, Odometry_msg):
         rospy.loginfo_once("Estimated base pose received from now on.")
         posestamp = PoseStamped()
-        posestamp.header.frame_id="odom"
-        posestamp.header.stamp=rospy.get_rostime()
+        posestamp.header.seq = 0
+        posestamp.header.stamp.secs = rospy.get_rostime().secs
+        posestamp.header.stamp.nsecs = rospy.get_rostime().nsecs
+        posestamp.header.frame_id="tracking_camera_odom"
+        # posestamp.header.stamp=rospy.get_rostime()
         posestamp.pose =Odometry_msg.pose.pose
 
         finalposestamp=self.listener.transformPose("/map", posestamp)
