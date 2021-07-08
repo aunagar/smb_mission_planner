@@ -215,6 +215,9 @@ class ChallengeMission(smach.State):
             self.estimated_yaw_rad = yaw_rad
 
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+            self.estimated_x_m = 1e9
+            self.estimated_y_m = 1e9
+            self.estimated_yaw_rad = 1e9
             pass
 
     def reachedWaypointWithTolerance(self):
