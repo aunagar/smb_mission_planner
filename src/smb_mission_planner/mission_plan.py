@@ -66,7 +66,7 @@ class ChallengeMission(smach.State):
         self.waypoint_idx = 0
         self.topic_names = topic_names
         self.exploration = exploration
-        self.listener = TransformListener()
+        self.listener = tf.TransformListener()
         self.waypoint_pose_publisher = rospy.Publisher(topic_names['waypoint'], PoseStamped, queue_size=1)
         self.base_pose_subscriber = rospy.Subscriber(topic_names['base_pose'], Odometry, self.basePoseCallback)
         while self.waypoint_pose_publisher.get_num_connections() == 0 and not rospy.is_shutdown():
