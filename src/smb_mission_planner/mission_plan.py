@@ -102,10 +102,20 @@ class DefaultMission(smach.State):
 
     def basePoseCallback(self, Odometry_msg):
         rospy.loginfo_once("Estimated base pose received from now on.")
-
-        x_m = Odometry_msg.pose.pose.position.x
-        y_m = Odometry_msg.pose.pose.position.y
-        quaternion = Odometry_msg.pose.pose.orientation
+        posestamp = PoseStamped()
+        posestamp.header.frame_id="odom"
+        posestamp.header.stamp=rospy.get_rostime()
+        posestamp.pose =Odometry_msg.pose.pose
+        self.base_pose_subscriber.transformPose("/map", posestamp)
+        
+        #t, r = self.listener.lookupTransform(self.world_frame,self.detection_frame,
+         #                                   rospy.Time(0))        
+        x_m=posestamp.pose.position.x
+        y_m=posestamp.pose.position.y
+        #x_m = Odometry_msg.pose.pose.position.x
+        #y_m = Odometry_msg.pose.pose.position.y
+        #quaternion = Odometry_msg.pose.pose.orientation
+        quaternion = posestamp.pose.orientation
         explicit_quat = [quaternion.x, quaternion.y, quaternion.z, quaternion.w]
         roll_rad, pitch_rad, yaw_rad = tf.transformations.euler_from_quaternion(explicit_quat)
 
