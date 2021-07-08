@@ -17,19 +17,52 @@ class MissionPlan():
 
     def createStateMachine(self):
         state_machine = smach.StateMachine(outcomes=['Success', 'Failure'])
+        mission_data = WaypointNavigation.read_missions_data(mission_file)
         with state_machine:
-            smach.StateMachine.add('Mission 1', DefaultMission(self.missions_data['test_mission'], self.topic_names),
-            transitions={'Completed':'Success', 'Aborted':'Failure', 'Next Waypoint':'Mission 1'})
+            smach.StateMachine.add('ENTER_DOOR', ChallengeMission(mission_data['enter_door'], self.topic_names),
+                                transitions={'Completed': 'START_EXPLORATION',
+                                                'Aborted': 'ENTER_SECOND_EXIT',
+                                                'Next Waypoint': 'ENTER_DOOR'})
+
+            smach.StateMachine.add('ENTER_SECOND_EXIT', ChallengeMission(mission_data['enter_second_exit'], self.topic_names),
+                                transitions={'Completed': 'EXPLORATION_SECOND_EXIT',
+                                                'Aborted': 'ENTER_DOOR'
+                                                'Next Waypoint': 'ENTER_SECOND_EXIT'})
+                                                
+            smach.StateMachine.add('EXPLORATION_DOOR', ChallengeMission(mission_data['exploration_door'], self.topic_names, exploration = True),
+                                transitions={'Completed': 'EXIT_DOOR',
+                                                'Aborted': 'EXIT_DOOR',
+                                                'Next Waypoint': 'EXPLORATION_DOOR'})
+                                                
+            smach.StateMachine.add('EXPLORATION_SECOND_EXIT', ChallengeMission(mission_data['exploration_second_exit'], self.topic_names, exploration = True),
+                                transitions={'Completed': 'EXIT_DOOR',
+                                                'Aborted': 'EXIT_SECOND_EXIT',
+                                                'Next Waypoint': 'EXPLORATION_SECOND_EXIT'})
+
+            smach.StateMachine.add('EXIT_DOOR', ChallengeMission(modission_data['exit_door'], self.topic_names),
+                                transitions={'Completed': 'GO_HOME',
+                                                'Aborted': 'EXIT_SECOND_EXIT',
+                                                'Next Waypoint': 'EXIT_DOOR'})
+                                                
+            smach.StateMachine.add('EXIT_SECOND_EXIT', ChallengeMission(mission_data['exit_second_exit'], self.topic_names),
+                                transitions={'Completed': 'GO_HOME',
+                                                'Aborted': 'EXIT_DOOR',
+                                                'Next Waypoint': 'EXIT_SECOND_EXIT'})
+            
+            smach.StateMachine.add('GO_HOME', ChallengeMission(mission_data['go_home'], self.topic_names),
+                                transitions={'Completed': 'Success',
+                                                'Aborted': 'Failure',
+                                                'Next Waypoint': 'GO_HOME'})
 
         return state_machine
 
-
-class DefaultMission(smach.State):
-    def __init__(self, mission_data, topic_names):
+class ChallengeMission(smach.State):
+    def __init__(self, mission_data, topic_names, exploration = False):
         smach.State.__init__(self, outcomes=['Completed', 'Aborted', 'Next Waypoint'])
         self.mission_data = mission_data
         self.waypoint_idx = 0
         self.topic_names = topic_names
+        self.exploration = exploration
 
         self.waypoint_pose_publisher = rospy.Publisher(topic_names['waypoint'], PoseStamped, queue_size=1)
         self.base_pose_subscriber = rospy.Subscriber(topic_names['base_pose'], Odometry, self.basePoseCallback)
@@ -42,12 +75,14 @@ class DefaultMission(smach.State):
                           topic_names['base_pose'] + "'.")
             rospy.sleep(1)
 
-        self.countdown_s = 60
+        self.countdown_s = 40
         self.countdown_decrement_s = 1
+        self.countdown_mission_abort = 80
         self.distance_to_waypoint_tolerance_m = 0.6
         self.angle_to_waypoint_tolerance_rad = 0.7
 
     def execute(self, userdata):
+
         if(self.waypoint_idx >= len(self.mission_data.keys())):
             rospy.loginfo("No more waypoints left in current mission.")
             self.waypoint_idx = 0
@@ -60,24 +95,74 @@ class DefaultMission(smach.State):
         rospy.loginfo("Waypoint set: '" + current_waypoint_name + "'.")
 
         countdown_s = self.countdown_s
-        while countdown_s and not rospy.is_shutdown():
-            if(self.reachedWaypointWithTolerance()):
-                rospy.loginfo("Waypoint '" + current_waypoint_name + "' reached before countdown ended. Loading next waypoint...")
+        if self.exploration:
+            while countdown_s and not rospy.is_shutdown():
+                if (self.reachedWaypointWithTolerance()):
+                    rospy.loginfo("Waypoint '" + current_waypoint_name + "' reached before countdown ended. Loading next waypoint. ..")
+                    self.waypoint_idx += 1
+                    return 'Next Waypoint'
+                else:
+                    rospy.loginfo(str(countdown_s) + "s left until changing or skipping waypoint '" + current_waypoint_name + "'.")
+                    rospy.sleep(self.countdown_decrement_s)
+                countdown_s -= self.countdown_decrement_s
+            rospy.logwarn("Countdown ended without reaching waypoint '" + current_waypoint_name + "'.")
+
+            if (self.waypoint_idx + 1 < len(self.mission_data.keys()): 
+                halfway_x = (current_waypoint['x_m'] - self.mission_data[current_waypoint_name]['x_m']) / 2.0
+                halfway_y = (current_waypoint['y_m'] - self.mission_data[current_waypoint_name]['y_m']) / 2.0
+                halfway_yaw = current_waypoint['yaw_rad']
+                next_waypoint_name = list(self.mission_data.keys())[self.waypoint_idx + 1]
+                next_waypoint = self.mission_data[next_waypoint_name]
+                if (math.sqrt(pow(next_waypoint['x_m'] - halfway_x, 2) + pow(next_waypoint['y_m'] - halfway_y, 2)) >= 0.4):
+                    halfway_waypoint = {'x_m' : halfway_x, 'y_m' : halfway_y, 'yaw_rad' : halfway_yaw}
+                    self.mission_data[current_waypoint_name] = halfway_waypoint
+                    rospy.loginfo("Halfway waypoint set: '" + current_waypoint_name + "'.")
+
+                    return 'Next Waypoint'
+                else: 
+                    rospy.logwarn("Skipping waypoint '" + current_waypoint_name + "'.")
+                    self.waypoint_idx += 1
+                    return 'Next Waypoint'
+
+            else:
+                rospy.logwarn("Skipping waypoint '" + current_waypoint_name + "'.")
                 self.waypoint_idx += 1
                 return 'Next Waypoint'
-            else:
-                rospy.loginfo(str(countdown_s) + "s left until skipping waypoint '" + current_waypoint_name + "'.")
-                rospy.sleep(self.countdown_decrement_s)
-            countdown_s -= self.countdown_decrement_s
-        rospy.logwarn("Countdown ended without reaching waypoint '" + current_waypoint_name + "'.")
-        if(self.waypoint_idx == 0):
-            rospy.logwarn("Starting waypoint of mission unreachable. Aborting current mission.")
-            self.waypoint_idx = 0.
-            return 'Aborted'
         else:
-            rospy.logwarn("Skipping waypoint '" + current_waypoint_name + "'.")
-            self.waypoint_idx += 1
-            return 'Next Waypoint'
+            if (self.waypoint_idx < len(self.mission_data.keys()) - 1):
+                while countdown_s and not rospy.is_shutdown():
+                    if(self.reachedWaypointWithTolerance()):
+                        rospy.loginfo("Waypoint '" + current_waypoint_name + "' reached before countdown ended. Loading next waypoint...")
+                        self.waypoint_idx += 1
+                        return 'Next Waypoint'
+                    else:
+                        rospy.loginfo(str(countdown_s) + "s left until skipping waypoint '" + current_waypoint_name + "'.")
+                        rospy.sleep(self.countdown_decrement_s)
+                    countdown_s -= self.countdown_decrement_s
+                rospy.logwarn("Countdown ended without reaching waypoint '" + current_waypoint_name + "'.")
+                if(self.waypoint_idx == 0):
+                    rospy.logwarn("Starting waypoint of mission unreachable. Aborting current mission.")
+                    self.waypoint_idx = 0.
+                    return 'Aborted'
+                else:
+                    rospy.logwarn("Skipping waypoint '" + current_waypoint_name + "'.")
+                    self.waypoint_idx += 1
+                    return 'Next Waypoint'
+            else:
+                countdown_mission_abort = self.countdown_mission_abort
+                while countdown_mission_abort and not rospy.is_shutdown():
+                    if(self.reachedWaypointWithTolerance()):
+                        rospy.loginfo("Waypoint '" + current_waypoint_name + "' reached before countdown ended. Loading next waypoint...")
+                        self.waypoint_idx += 1
+                        return 'Next Waypoint'
+                    else:
+                        rospy.loginfo(str(countdown_mission_abort) + "s left until skipping waypoint '" + current_waypoint_name + "'.")
+                        rospy.sleep(self.countdown_decrement_s)
+                    countdown_mission_abort -= self.countdown_decrement_s
+                rospy.logwarn("Countdown ended without reaching waypoint '" + current_waypoint_name + "'.")
+                rospy.logwarn("Last waypoint of mission unreachable. Aborting current mission.")
+                return 'Aborted'
+
 
     def setWaypoint(self, x_m, y_m, yaw_rad):
         quaternion = tf.transformations.quaternion_from_euler(0., 0., yaw_rad)
