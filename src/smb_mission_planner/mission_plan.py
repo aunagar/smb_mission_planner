@@ -194,12 +194,8 @@ class ChallengeMission(smach.State):
         posestamp.header.frame_id="odom"
         posestamp.header.stamp=rospy.get_rostime()
         posestamp.pose =Odometry_msg.pose.pose
-<<<<<<< HEAD
 
         finalposestamp=self.listener.transformPose("/map", posestamp)
-=======
-        # self.base_pose_subscriber.transformPose("/map", posestamp)
->>>>>>> 13a1d54533a6d87b6649ced0043bdb37421b49a0
         
         #t, r = self.listener.lookupTransform(self.world_frame,self.detection_frame,
          #                                   rospy.Time(0))        
