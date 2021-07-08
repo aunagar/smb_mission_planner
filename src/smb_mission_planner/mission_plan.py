@@ -199,23 +199,23 @@ class ChallengeMission(smach.State):
         posestamp.pose =Odometry_msg.pose.pose
         try:
             finalposestamp=self.listener.transformPose("/map", posestamp)
+            #t, r = self.listener.lookupTransform(self.world_frame,self.detection_frame,
+            #                                   rospy.Time(0))        
+            x_m=finalposestamp.pose.position.x
+            y_m=finalposestamp.pose.position.y
+            #x_m = Odometry_msg.pose.pose.position.x
+            #y_m = Odometry_msg.pose.pose.position.y
+            #quaternion = Odometry_msg.pose.pose.orientation
+            quaternion = finalposestamp.pose.orientation
+            explicit_quat = [quaternion.x, quaternion.y, quaternion.z, quaternion.w]
+            roll_rad, pitch_rad, yaw_rad = tf.transformations.euler_from_quaternion(explicit_quat)
+
+            self.estimated_x_m = x_m
+            self.estimated_y_m = y_m
+            self.estimated_yaw_rad = yaw_rad
+
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             pass
-        
-        #t, r = self.listener.lookupTransform(self.world_frame,self.detection_frame,
-         #                                   rospy.Time(0))        
-        x_m=finalposestamp.pose.position.x
-        y_m=finalposestamp.pose.position.y
-        #x_m = Odometry_msg.pose.pose.position.x
-        #y_m = Odometry_msg.pose.pose.position.y
-        #quaternion = Odometry_msg.pose.pose.orientation
-        quaternion = finalposestamp.pose.orientation
-        explicit_quat = [quaternion.x, quaternion.y, quaternion.z, quaternion.w]
-        roll_rad, pitch_rad, yaw_rad = tf.transformations.euler_from_quaternion(explicit_quat)
-
-        self.estimated_x_m = x_m
-        self.estimated_y_m = y_m
-        self.estimated_yaw_rad = yaw_rad
 
     def reachedWaypointWithTolerance(self):
         try:
