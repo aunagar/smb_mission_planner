@@ -174,7 +174,7 @@ class ChallengeMission(smach.State):
         pose_stamped_msg.header.seq = 0
         pose_stamped_msg.header.stamp.secs = rospy.get_rostime().secs
         pose_stamped_msg.header.stamp.nsecs = rospy.get_rostime().nsecs
-        pose_stamped_msg.header.frame_id = "tracking_camera_odom"
+        pose_stamped_msg.header.frame_id = "map"
         pose_stamped_msg.pose.position.x = x_m
         pose_stamped_msg.pose.position.y = y_m
         pose_stamped_msg.pose.position.z = 0.
