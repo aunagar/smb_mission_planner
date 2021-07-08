@@ -40,7 +40,7 @@ class MissionPlanner():
 
         # Execute state machine.
         outcome = state_machine.execute()
-        rospy.loginfo("Mission plan terminated with outcome '" + outcome + "'.")
+        rospy.loginfo("Mission plan terminated with outcome" + outcome + ".")
 
         # Wait for ctrl-c to stop the application
         introspection_server.stop()
