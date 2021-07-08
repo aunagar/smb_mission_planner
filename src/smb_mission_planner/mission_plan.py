@@ -11,48 +11,51 @@ import math
 
 class MissionPlan():
     def __init__(self, missions_data, topic_names):
-        self.missions_data = missions_data
+        self.mission_data = missions_data
         self.topic_names = topic_names
 
 
     def createStateMachine(self):
         state_machine = smach.StateMachine(outcomes=['Success', 'Failure'])
-        mission_data = WaypointNavigation.read_missions_data(mission_file)
         with state_machine:
-            smach.StateMachine.add('ENTER_DOOR', ChallengeMission(mission_data['enter_door'], self.topic_names),
-                                transitions={'Completed': 'START_EXPLORATION',
+            smach.StateMachine.add('ENTER_DOOR', ChallengeMission(self.mission_data['enter_door'], self.topic_names),
+                                transitions={'Completed': 'EXPLORATION_DOOR',
                                                 'Aborted': 'ENTER_SECOND_EXIT',
                                                 'Next Waypoint': 'ENTER_DOOR'})
 
-            smach.StateMachine.add('ENTER_SECOND_EXIT', ChallengeMission(mission_data['enter_second_exit'], self.topic_names),
+            smach.StateMachine.add('ENTER_SECOND_EXIT', ChallengeMission(self.mission_data['enter_second_exit'], self.topic_names),
                                 transitions={'Completed': 'EXPLORATION_SECOND_EXIT',
-                                                'Aborted': 'ENTER_DOOR'
+                                                'Aborted': 'ENTER_DOOR',
                                                 'Next Waypoint': 'ENTER_SECOND_EXIT'})
                                                 
-            smach.StateMachine.add('EXPLORATION_DOOR', ChallengeMission(mission_data['exploration_door'], self.topic_names, exploration = True),
+            smach.StateMachine.add('EXPLORATION_DOOR', ChallengeMission(self.mission_data['exploration_door'], self.topic_names, exploration = True),
                                 transitions={'Completed': 'EXIT_DOOR',
                                                 'Aborted': 'EXIT_DOOR',
                                                 'Next Waypoint': 'EXPLORATION_DOOR'})
                                                 
-            smach.StateMachine.add('EXPLORATION_SECOND_EXIT', ChallengeMission(mission_data['exploration_second_exit'], self.topic_names, exploration = True),
+            smach.StateMachine.add('EXPLORATION_SECOND_EXIT', ChallengeMission(self.mission_data['exploration_second_exit'], self.topic_names, exploration = True),
                                 transitions={'Completed': 'EXIT_DOOR',
                                                 'Aborted': 'EXIT_SECOND_EXIT',
                                                 'Next Waypoint': 'EXPLORATION_SECOND_EXIT'})
 
-            smach.StateMachine.add('EXIT_DOOR', ChallengeMission(modission_data['exit_door'], self.topic_names),
-                                transitions={'Completed': 'GO_HOME',
+            smach.StateMachine.add('EXIT_DOOR', ChallengeMission(self.mission_data['exit_door'], self.topic_names),
+                                transitions={'Completed': 'GO_HOME_DOOR',
                                                 'Aborted': 'EXIT_SECOND_EXIT',
                                                 'Next Waypoint': 'EXIT_DOOR'})
                                                 
-            smach.StateMachine.add('EXIT_SECOND_EXIT', ChallengeMission(mission_data['exit_second_exit'], self.topic_names),
-                                transitions={'Completed': 'GO_HOME',
+            smach.StateMachine.add('EXIT_SECOND_EXIT', ChallengeMission(self.mission_data['exit_second_exit'], self.topic_names),
+                                transitions={'Completed': 'GO_HOME_SECOND_EXIT',
                                                 'Aborted': 'EXIT_DOOR',
                                                 'Next Waypoint': 'EXIT_SECOND_EXIT'})
             
-            smach.StateMachine.add('GO_HOME', ChallengeMission(mission_data['go_home'], self.topic_names),
+            smach.StateMachine.add('GO_HOME_DOOR', ChallengeMission(self.mission_data['go_home_door'], self.topic_names),
                                 transitions={'Completed': 'Success',
                                                 'Aborted': 'Failure',
-                                                'Next Waypoint': 'GO_HOME'})
+                                                'Next Waypoint': 'GO_HOME_DOOR'})
+            smach.StateMachine.add('GO_HOME_SECOND_EXIT', ChallengeMission(self.mission_data['go_home_second_exit'], self.topic_names),
+                                transitions={'Completed': 'Success',
+                                                'Aborted': 'Failure',
+                                                'Next Waypoint': 'GO_HOME_SECOND_EXIT'})
 
         return state_machine
 
@@ -107,7 +110,7 @@ class ChallengeMission(smach.State):
                 countdown_s -= self.countdown_decrement_s
             rospy.logwarn("Countdown ended without reaching waypoint '" + current_waypoint_name + "'.")
 
-            if (self.waypoint_idx + 1 < len(self.mission_data.keys()): 
+            if (self.waypoint_idx + 1 < len(self.mission_data.keys())): 
                 halfway_x = (current_waypoint['x_m'] - self.mission_data[current_waypoint_name]['x_m']) / 2.0
                 halfway_y = (current_waypoint['y_m'] - self.mission_data[current_waypoint_name]['y_m']) / 2.0
                 halfway_yaw = current_waypoint['yaw_rad']
@@ -191,7 +194,7 @@ class ChallengeMission(smach.State):
         posestamp.header.frame_id="odom"
         posestamp.header.stamp=rospy.get_rostime()
         posestamp.pose =Odometry_msg.pose.pose
-        self.base_pose_subscriber.transformPose("/map", posestamp)
+        # self.base_pose_subscriber.transformPose("/map", posestamp)
         
         #t, r = self.listener.lookupTransform(self.world_frame,self.detection_frame,
          #                                   rospy.Time(0))        
