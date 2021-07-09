@@ -78,11 +78,11 @@ class ChallengeMission(smach.State):
                           topic_names['base_pose'] + "'.")
             rospy.sleep(1)
 
-        self.countdown_s = 40
+        self.countdown_s = 20
         self.countdown_decrement_s = 1
         self.countdown_mission_abort = 80
-        self.distance_to_waypoint_tolerance_m = 0.6
-        self.angle_to_waypoint_tolerance_rad = 0.7
+        self.distance_to_waypoint_tolerance_m = 2.0
+        self.angle_to_waypoint_tolerance_rad = 1.0
 
     def execute(self, userdata):
 
@@ -91,7 +91,7 @@ class ChallengeMission(smach.State):
             self.waypoint_idx = 0
             return 'Completed'
 
-        current_waypoint_name = list(self.mission_data.keys())[self.waypoint_idx]
+        current_waypoint_name = list(self.mission_data.keys())[int(self.waypoint_idx)]
         current_waypoint = self.mission_data[current_waypoint_name]
 
         self.setWaypoint(current_waypoint['x_m'], current_waypoint['y_m'], current_waypoint['yaw_rad'])
@@ -109,28 +109,9 @@ class ChallengeMission(smach.State):
                     rospy.sleep(self.countdown_decrement_s)
                 countdown_s -= self.countdown_decrement_s
             rospy.logwarn("Countdown ended without reaching waypoint '" + current_waypoint_name + "'.")
-
-            if (self.waypoint_idx + 1 < len(self.mission_data.keys())): 
-                halfway_x = (current_waypoint['x_m'] - self.mission_data[current_waypoint_name]['x_m']) / 2.0
-                halfway_y = (current_waypoint['y_m'] - self.mission_data[current_waypoint_name]['y_m']) / 2.0
-                halfway_yaw = current_waypoint['yaw_rad']
-                next_waypoint_name = list(self.mission_data.keys())[self.waypoint_idx + 1]
-                next_waypoint = self.mission_data[next_waypoint_name]
-                if (math.sqrt(pow(next_waypoint['x_m'] - halfway_x, 2) + pow(next_waypoint['y_m'] - halfway_y, 2)) >= 0.4):
-                    halfway_waypoint = {'x_m' : halfway_x, 'y_m' : halfway_y, 'yaw_rad' : halfway_yaw}
-                    self.mission_data[current_waypoint_name] = halfway_waypoint
-                    rospy.loginfo("Halfway waypoint set: '" + current_waypoint_name + "'.")
-
-                    return 'Next Waypoint'
-                else: 
-                    rospy.logwarn("Skipping waypoint '" + current_waypoint_name + "'.")
-                    self.waypoint_idx += 1
-                    return 'Next Waypoint'
-
-            else:
-                rospy.logwarn("Skipping waypoint '" + current_waypoint_name + "'.")
-                self.waypoint_idx += 1
-                return 'Next Waypoint'
+            rospy.logwarn("Skipping waypoint '" + current_waypoint_name + "'.")
+            self.waypoint_idx += 1
+            return 'Next Waypoint'
         else:
             if (self.waypoint_idx < len(self.mission_data.keys()) - 1):
                 while countdown_s and not rospy.is_shutdown():
@@ -143,14 +124,9 @@ class ChallengeMission(smach.State):
                         rospy.sleep(self.countdown_decrement_s)
                     countdown_s -= self.countdown_decrement_s
                 rospy.logwarn("Countdown ended without reaching waypoint '" + current_waypoint_name + "'.")
-                if(self.waypoint_idx == 0):
-                    rospy.logwarn("Starting waypoint of mission unreachable. Aborting current mission.")
-                    self.waypoint_idx = 0.
-                    return 'Aborted'
-                else:
-                    rospy.logwarn("Skipping waypoint '" + current_waypoint_name + "'.")
-                    self.waypoint_idx += 1
-                    return 'Next Waypoint'
+                rospy.logwarn("Skipping waypoint '" + current_waypoint_name + "'.")
+                self.waypoint_idx += 1
+                return 'Next Waypoint'
             else:
                 countdown_mission_abort = self.countdown_mission_abort
                 while countdown_mission_abort and not rospy.is_shutdown():
@@ -194,10 +170,11 @@ class ChallengeMission(smach.State):
         posestamp.header.seq = 0
         posestamp.header.stamp.secs = rospy.get_rostime().secs
         posestamp.header.stamp.nsecs = rospy.get_rostime().nsecs
-        posestamp.header.frame_id="tracking_camera_odom"
+        posestamp.header.frame_id="/base_link"
         # posestamp.header.stamp=rospy.get_rostime()
         posestamp.pose =Odometry_msg.pose.pose
         try:
+            self.listener.waitForTransform("/map","/base_link",posestamp.header.stamp,rospy.Duration(10))
             finalposestamp=self.listener.transformPose("/map", posestamp)
             #t, r = self.listener.lookupTransform(self.world_frame,self.detection_frame,
             #                                   rospy.Time(0))        
